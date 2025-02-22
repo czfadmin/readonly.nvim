@@ -25,9 +25,6 @@ local default_config = {
   },
 }
 
--- Default configuration
-M.config = default_config
-
 local function escape_pattern(str)
   -- 转义特殊字符，包括空格
   return str:gsub("[%(%)%.%%%+%-%*%?%[%]%^%$%s]", "%%%1")
@@ -158,7 +155,7 @@ M.config = config
 
 ---@param opts Config?
 function M.setup(opts)
-  M.config = vim.tbl_deep_extend("force", M.config, opts or {})
+  M.config = vim.tbl_deep_extend("force", M.config, opts or default_config)
 
   local group = vim.api.nvim_create_augroup("ReadOnlyBuffers", {
     clear = true,
