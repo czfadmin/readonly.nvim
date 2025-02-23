@@ -3,31 +3,30 @@
 local M = {}
 
 local default_config = {
-  restricted_directories = {
-    "/etc", -- 默认不可编辑的目录
-    "/usr", -- 另一个常见的不可编辑目录
-    "/var", -- 另一个常见的不可编辑目录
-    "/tmp", -- 临时文件目录
+  restricted_directories = {"/etc", -- 默认不可编辑的目录
+  "/usr", -- 另一个常见的不可编辑目录
+  "/var", -- 另一个常见的不可编辑目录
+  "/tmp" -- 临时文件目录
   },
   exclude_directories = {},
   language_directories = {
-    js = { "node_modules", "dist" }, -- Node.js 相关目录
-    python = { "__pycache__", "venv" }, -- Python 相关目录
-    ruby = { "vendor", "log" }, -- Ruby 相关目录
-    php = { "vendor" }, -- PHP 相关目录
-    go = { "bin", "pkg" }, -- Go 相关目录
-    java = { "target", "out" }, -- Java 相关目录
-    c = { "build", "bin" }, -- C/C++ 相关目录
-    rust = { "target" }, -- Rust 相关目录
-    elixir = { "_build", "deps" }, -- Elixir 相关目录
-    haskell = { ".stack-work" }, -- Haskell 相关目录
-    scala = { "target" }, -- Scala 相关目录
-  },
+    js = {"node_modules", "dist"}, -- Node.js 相关目录
+    python = {"__pycache__", "venv"}, -- Python 相关目录
+    ruby = {"vendor", "log"}, -- Ruby 相关目录
+    php = {"vendor"}, -- PHP 相关目录
+    go = {"bin", "pkg"}, -- Go 相关目录
+    java = {"target", "out"}, -- Java 相关目录
+    c = {"build", "bin"}, -- C/C++ 相关目录
+    rust = {"target"}, -- Rust 相关目录
+    elixir = {"_build", "deps"}, -- Elixir 相关目录
+    haskell = {".stack-work"}, -- Haskell 相关目录
+    scala = {"target"} -- Scala 相关目录
+  }
 }
 
 local function escape_pattern(str)
-  -- 转义特殊字符，包括空格
-  return str:gsub("[%(%)%.%%%+%-%*%?%[%]%^%$%s]", "%%%1")
+  -- 转义特殊字符，包括空格和路径分隔符
+  return str:gsub("[%(%)%.%%%+%-%*%?%[%]%^%$%s/]", "%%%1")
 end
 
 local function normalize_path(path)
@@ -41,7 +40,40 @@ local function normalize_path(path)
   path = path:gsub("\\", "/")
   -- 处理多个连续的斜杠
   path = path:gsub("//+", "/")
+  -- 处理相对路径
+  path = path:gsub("^%./", "")
+  -- 确保路径以斜杠开始（便于匹配）
+  if not path:match("^/") then
+    path = "/" .. path
+  end
   return path
+end
+
+local function is_path_match(path, pattern)
+  -- 标准化路径和模式
+  path = normalize_path(path)
+  pattern = normalize_path(pattern)
+
+  -- 转义模式中的特殊字符
+  -- pattern = escape_pattern(pattern)
+
+  -- 构建匹配模式：
+  -- 1. 完全匹配
+  -- 2. 作为目录的一部分匹配（前后都有斜杠）
+  -- 3. 作为开头匹配（后面有斜杠）
+  -- 4. 作为结尾匹配（前面有斜杠）
+  -- 5. 作为路径中的任意部分匹配（前后都有斜杠）
+  local patterns = {"^" .. pattern .. "$", "/" .. pattern .. "/",
+                    "^" .. pattern .. "/", "/" .. pattern .. "$", pattern -- 允许匹配路径中的任意部分
+  }
+
+  -- 检查所有匹配模式
+  for _, p in ipairs(patterns) do
+    if string.match(path, p) then
+      return true
+    end
+  end
+  return false
 end
 
 local function check_is_excluded(file_path)
@@ -52,12 +84,7 @@ local function check_is_excluded(file_path)
   for _, dir in ipairs(M.config.exclude_directories) do
     -- 处理字符串类型的排除目录
     if type(dir) == "string" then
-      local escaped_dir = escape_pattern(normalize_path(dir))
-      -- 使用严格的路径匹配，确保匹配完整路径或子路径
-      if
-        string.match(file_path, "^" .. escaped_dir .. "/?")
-        or string.match(file_path, "/" .. escaped_dir .. "/?")
-      then
+      if is_path_match(file_path, dir) then
         vim.bo.readonly = false
         vim.bo.modifiable = true
         return true
@@ -65,12 +92,7 @@ local function check_is_excluded(file_path)
       -- 处理表类型的排除目录
     elseif type(dir) == "table" then
       for _, subdir in ipairs(dir) do
-        local escaped_subdir = escape_pattern(normalize_path(subdir))
-        -- 对表中的每个路径使用相同的匹配规则
-        if
-          string.match(file_path, "^" .. escaped_subdir .. "/?")
-          or string.match(file_path, "/" .. escaped_subdir .. "/?")
-        then
+        if is_path_match(file_path, subdir) then
           vim.bo.readonly = false
           vim.bo.modifiable = true
           return true
@@ -100,43 +122,34 @@ function M.check_readonly()
 
   -- 检查通用不可编辑目录
   for _, dir in ipairs(M.config.restricted_directories) do
-    local escaped_dir = escape_pattern(normalize_path(dir))
-    if
-      string.match(file_path, "^" .. escaped_dir .. "/?")
-      or string.match(file_path, "/" .. escaped_dir .. "/?")
-    then
+    if is_path_match(file_path, dir) then
       vim.bo.readonly = true
       vim.bo.modifiable = false
       print(
-        "This buffer is read-only because it is in a restricted directory: "
-          .. dir
-      )
+        "This buffer is read-only because it is in a restricted directory: " ..
+          dir)
       return true
     end
   end
 
   -- 检查特定语言的目录
   local filetype = vim.bo.filetype
-  if M.config.language_directories[filetype] then
+  if filetype and M.config.language_directories[filetype] then
     for _, dir in ipairs(M.config.language_directories[filetype]) do
-      local escaped_dir = escape_pattern(normalize_path(dir))
-      if string.match(file_path, escaped_dir) then
-        if check_is_excluded(file_path) then
-          return false
-        end
+      if is_path_match(file_path, dir) then
         vim.bo.readonly = true
         vim.bo.modifiable = false
         print(
-          "This buffer is read-only because it is in a restricted directory for "
-            .. filetype
-            .. ": "
-            .. dir
-        )
+          "This buffer is read-only because it is in a restricted directory for " ..
+            filetype .. ": " .. dir)
         return true
       end
     end
   end
 
+  -- 默认允许编辑
+  vim.bo.readonly = false
+  vim.bo.modifiable = true
   return false
 end
 
@@ -147,7 +160,7 @@ end
 local config = {
   restricted_directories = {},
   exclude_directories = {},
-  language_directories = {},
+  language_directories = {}
 }
 
 ---@type Config
@@ -155,15 +168,15 @@ M.config = config
 
 ---@param opts Config?
 function M.setup(opts)
-  M.config = vim.tbl_deep_extend("force", M.config, opts or default_config)
+  M.config = vim.tbl_deep_extend("force", M.config, opts or {})
 
   local group = vim.api.nvim_create_augroup("ReadOnlyBuffers", {
-    clear = true,
+    clear = true
   })
 
   vim.api.nvim_create_autocmd("BufEnter", {
     group = group,
-    callback = M.check_readonly,
+    callback = M.check_readonly
   })
 end
 
