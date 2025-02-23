@@ -1,12 +1,23 @@
-# Readonly.nvim
+*readonlytxt*     For Neovim >= 0.8.0    Last change: 2025 Feb 22
+
+==============================================================================
+Table of Contents                         *readonly*
+
+1. Capture        |readonly|
+  - Using it              |using-it|
+  - Features and structure|features-and-structure|
+
+==============================================================================
+1. Capture       *readonly*
 
 The file you open is in read-only mode, so it won't be accidentally modified, similar to the file read-only function in VSCODE
 
-## HOW TO USE IT?
+Readonly.nvim
 
-- lazyvim
 
-```lua
+USING IT                  *readonly*
+
+>
 return {
   "czfadmin/readonly.nvim",
   event = "BufReadPre",
@@ -38,4 +49,6 @@ return {
     require("readonly").setup(opts)
   end,
 }
-```
+>
+
+
