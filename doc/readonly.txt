@@ -3,19 +3,19 @@
 ==============================================================================
 Table of Contents                         *readonly*
 
-1. Capture        |readonly|
-  - Using it              |using-it|
-  - Features and structure|features-and-structure|
+1. Introduction        |readonly-introduction|
+  - Using it              |readonly-using-it|
+  - Features and structure|readonly-features-and-structure|
 
 ==============================================================================
-1. Capture       *readonly*
+1. Capture       *readonly-introduction*
 
 The file you open is in read-only mode, so it won't be accidentally modified, similar to the file read-only function in VSCODE
 
 Readonly.nvim
 
 
-USING IT                  *readonly*
+USING IT                  *readonly-using-it*
 
 >
 return {
