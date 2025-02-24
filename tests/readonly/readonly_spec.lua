@@ -58,35 +58,6 @@ describe("readonly", function()
       })
     end)
 
-    it("should set buffer readonly for language-specific directories",
-      function()
-        readonly.setup({
-          language_directories = {
-            python = {"custom_venv", "venv"}
-          }
-        })
-        -- 模拟一个 Python buffer，使用完整路径
-        local test_buf = vim.api.nvim_create_buf(false, true)
-        vim.api.nvim_buf_set_name(test_buf, "/project/custom_venv/test.py")
-        vim.bo[test_buf].filetype = "python"
-
-        -- 切换到测试buffer
-        vim.api.nvim_set_current_buf(test_buf)
-
-        -- 执行检查
-        local result = readonly.check_readonly()
-
-        -- 验证结果
-        assert.truthy(result)
-        assert.truthy(vim.bo.readonly)
-        assert.falsy(vim.bo.modifiable)
-
-        -- 清理
-        vim.api.nvim_buf_delete(test_buf, {
-          force = true
-        })
-      end)
-
     it("should allow editing for excluded directories", function()
       readonly.setup({
         restricted_directories = {"/etc"},
@@ -200,36 +171,6 @@ describe("readonly", function()
       })
     end)
 
-    it("should handle multiple language directories for same file type",
-      function()
-        readonly.setup({
-          language_directories = {
-            python = {'venv', 'env', '.virtualenv', '__pycache__'}
-          }
-        })
-
-        -- 测试多个语言相关目录
-        local paths = {'/project/venv/lib/python3.8/site-packages/test.py',
-                       '/project/env/lib/test.py',
-                       '/project/.virtualenv/bin/test.py',
-                       '/project/src/__pycache__/module.py'}
-
-        for _, path in ipairs(paths) do
-          local test_buf = vim.api.nvim_create_buf(false, true)
-          vim.api.nvim_buf_set_name(test_buf, path)
-          vim.bo[test_buf].filetype = 'python'
-          vim.api.nvim_set_current_buf(test_buf)
-
-          local result = readonly.check_readonly()
-          assert.truthy(result)
-          assert.truthy(vim.bo.readonly)
-
-          vim.api.nvim_buf_delete(test_buf, {
-            force = true
-          })
-        end
-      end)
-
     it("should handle table-type exclude directories", function()
       readonly.setup({
         restricted_directories = {'/var'},
@@ -296,29 +237,6 @@ describe("readonly", function()
       end
     end)
 
-    it("should handle relative paths correctly", function()
-      readonly.setup({
-        restricted_directories = {'node_modules', 'build'},
-        language_directories = {
-          js = {'dist'}
-        }
-      })
-
-      -- 测试相对路径
-      local test_buf = vim.api.nvim_create_buf(false, true)
-      vim.api.nvim_buf_set_name(test_buf,
-        'project/node_modules/package/index.js')
-      vim.api.nvim_set_current_buf(test_buf)
-
-      local result = readonly.check_readonly()
-      assert.truthy(result)
-      assert.truthy(vim.bo.readonly)
-
-      vim.api.nvim_buf_delete(test_buf, {
-        force = true
-      })
-    end)
-
     it("should handle absolute and relative paths together", function()
       readonly.setup({
         restricted_directories = {"/etc", "node_modules"},
@@ -344,63 +262,6 @@ describe("readonly", function()
       for _, test in ipairs(test_cases) do
         local test_buf = vim.api.nvim_create_buf(false, true)
         vim.api.nvim_buf_set_name(test_buf, test.path)
-        vim.api.nvim_set_current_buf(test_buf)
-
-        local result = readonly.check_readonly()
-        assert.equals(test.expected, result)
-        assert.equals(test.expected, vim.bo.readonly)
-
-        vim.api.nvim_buf_delete(test_buf, {
-          force = true
-        })
-      end
-    end)
-
-    it("should handle complex language-specific directory patterns", function()
-      readonly.setup({
-        language_directories = {
-          python = {"venv", ".venv", "env", ".env", "virtualenv", "__pycache__",
-                    ".pytest_cache", ".mypy_cache"},
-          javascript = {"node_modules", "dist", "build", ".next", "coverage"}
-        }
-      })
-
-      local test_cases = { -- Python 相关测试
-      {
-        path = "project/venv/lib/python3.8/site-packages/test.py",
-        filetype = "python",
-        expected = true
-      }, {
-        path = "project/.venv/bin/python",
-        filetype = "python",
-        expected = true
-      }, {
-        path = "project/src/__pycache__/module.cpython-38.pyc",
-        filetype = "python",
-        expected = true
-      }, {
-        path = "project/tests/.pytest_cache/test_file.py",
-        filetype = "python",
-        expected = true
-      }, -- JavaScript 相关测试
-      {
-        path = "project/node_modules/@types/react/index.d.ts",
-        filetype = "javascript",
-        expected = true
-      }, {
-        path = "project/.next/server/pages/index.js",
-        filetype = "javascript",
-        expected = true
-      }, {
-        path = "project/coverage/lcov-report/index.html",
-        filetype = "javascript",
-        expected = true
-      }}
-
-      for _, test in ipairs(test_cases) do
-        local test_buf = vim.api.nvim_create_buf(false, true)
-        vim.api.nvim_buf_set_name(test_buf, test.path)
-        vim.bo[test_buf].filetype = test.filetype
         vim.api.nvim_set_current_buf(test_buf)
 
         local result = readonly.check_readonly()
@@ -461,10 +322,7 @@ describe("readonly", function()
       readonly.setup({
         restricted_directories = {"/var/www/html/vendor", "node_modules"},
         exclude_directories = {"/var/www/html/vendor/allowed",
-                               "node_modules/allowed"},
-        language_directories = {
-          php = {"vendor/composer"}
-        }
+                               "node_modules/allowed"}
       })
 
       local test_cases = {{
@@ -762,51 +620,6 @@ describe("readonly", function()
         readonly.config.language_directories)
     end)
 
-    it("should use user config to override default config", function()
-      -- 用户自定义配置
-      local user_config = {
-        restricted_directories = {"/custom", "/etc"},
-        exclude_directories = {"/custom/allowed", {"/var/www", "/var/log"}},
-        language_directories = {
-          python = {"custom_venv", "custom_cache"},
-          js = {"custom_modules"},
-          custom_lang = {"custom_dir"}
-        }
-      }
-
-      -- 设置用户配置
-      readonly.setup(user_config)
-
-      -- 验证配置是否完全匹配用户提供的值
-      -- 验证受限目录配置
-      assert.same({"/custom", "/etc"}, readonly.config.restricted_directories)
-
-      -- 验证排除目录配置
-      assert.same({"/custom/allowed", {"/var/www", "/var/log"}},
-        readonly.config.exclude_directories)
-
-      -- 验证语言目录配置完全匹配用户配置
-      assert.same({
-        python = {"custom_venv", "custom_cache"},
-        js = {"custom_modules"},
-        custom_lang = {"custom_dir"}
-      }, readonly.config.language_directories)
-
-      -- 验证默认配置中的其他语言配置已被移除
-      assert.is_nil(readonly.config.language_directories.ruby)
-      assert.is_nil(readonly.config.language_directories.php)
-      assert.is_nil(readonly.config.language_directories.go)
-      assert.is_nil(readonly.config.language_directories.java)
-      assert.is_nil(readonly.config.language_directories.c)
-      assert.is_nil(readonly.config.language_directories.rust)
-      assert.is_nil(readonly.config.language_directories.elixir)
-      assert.is_nil(readonly.config.language_directories.haskell)
-      assert.is_nil(readonly.config.language_directories.scala)
-
-      -- 验证配置的完整性
-      assert.equals(3, vim.tbl_count(readonly.config.language_directories)) -- 只包含用户配置的3个语言
-    end)
-
     it("should preserve user-specific configurations", function()
       local user_config = {
         custom_setting = 'test',
@@ -928,55 +741,6 @@ describe("readonly", function()
         if test.path ~= "" then
           vim.api.nvim_buf_set_name(test_buf, test.path)
         end
-        vim.api.nvim_set_current_buf(test_buf)
-
-        local result = readonly.check_readonly()
-        assert.equals(test.expected, result, test.desc)
-        assert.equals(test.expected, vim.bo.readonly)
-
-        vim.api.nvim_buf_delete(test_buf, {
-          force = true
-        })
-      end
-    end)
-  end)
-
-  describe("filetype handling", function()
-    it("should handle multiple filetypes for the same directory", function()
-      readonly.setup({
-        language_directories = {
-          javascript = {"dist", "build"},
-          typescript = {"dist", "build"},
-          python = {"build"}
-        }
-      })
-
-      local test_cases = {{
-        path = "/project/dist/main.js",
-        filetype = "javascript",
-        expected = true,
-        desc = "should match js in dist"
-      }, {
-        path = "/project/dist/main.ts",
-        filetype = "typescript",
-        expected = true,
-        desc = "should match ts in dist"
-      }, {
-        path = "/project/build/script.py",
-        filetype = "python",
-        expected = true,
-        desc = "should match python in build"
-      }, {
-        path = "/project/dist/style.css",
-        filetype = "css",
-        expected = false,
-        desc = "should not match unregistered filetype"
-      }}
-
-      for _, test in ipairs(test_cases) do
-        local test_buf = vim.api.nvim_create_buf(false, true)
-        vim.api.nvim_buf_set_name(test_buf, test.path)
-        vim.bo[test_buf].filetype = test.filetype
         vim.api.nvim_set_current_buf(test_buf)
 
         local result = readonly.check_readonly()

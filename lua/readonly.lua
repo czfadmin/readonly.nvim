@@ -3,25 +3,13 @@
 local M = {}
 
 local default_config = {
-  restricted_directories = {"/etc", -- 默认不可编辑的目录
-  "/usr", -- 另一个常见的不可编辑目录
-  "/var", -- 另一个常见的不可编辑目录
-  "/tmp" -- 临时文件目录
+  restricted_directories = {
+    "/etc",
+    "/usr",
+    "/var",
+    "/tmp" -- 临时文件目录
   },
-  exclude_directories = {},
-  language_directories = {
-    js = {"node_modules", "dist"}, -- Node.js 相关目录
-    python = {"__pycache__", "venv"}, -- Python 相关目录
-    ruby = {"vendor", "log"}, -- Ruby 相关目录
-    php = {"vendor"}, -- PHP 相关目录
-    go = {"bin", "pkg"}, -- Go 相关目录
-    java = {"target", "out"}, -- Java 相关目录
-    c = {"build", "bin"}, -- C/C++ 相关目录
-    rust = {"target"}, -- Rust 相关目录
-    elixir = {"_build", "deps"}, -- Elixir 相关目录
-    haskell = {".stack-work"}, -- Haskell 相关目录
-    scala = {"target"} -- Scala 相关目录
-  }
+  exclude_directories = {}
 }
 
 local function escape_pattern(str)
@@ -63,8 +51,12 @@ local function is_path_match(path, pattern)
   -- 3. 作为开头匹配（后面有斜杠）
   -- 4. 作为结尾匹配（前面有斜杠）
   -- 5. 作为路径中的任意部分匹配（前后都有斜杠）
-  local patterns = {"^" .. pattern .. "$", "/" .. pattern .. "/",
-                    "^" .. pattern .. "/", "/" .. pattern .. "$", pattern -- 允许匹配路径中的任意部分
+  local patterns = {
+    "^" .. pattern .. "$",
+    "/" .. pattern .. "/",
+    "^" .. pattern .. "/",
+    "/" .. pattern .. "$",
+    pattern -- 允许匹配路径中的任意部分
   }
 
   -- 检查所有匹配模式
@@ -85,16 +77,12 @@ local function check_is_excluded(file_path)
     -- 处理字符串类型的排除目录
     if type(dir) == "string" then
       if is_path_match(file_path, dir) then
-        vim.bo.readonly = false
-        vim.bo.modifiable = true
         return true
       end
       -- 处理表类型的排除目录
     elseif type(dir) == "table" then
       for _, subdir in ipairs(dir) do
         if is_path_match(file_path, subdir) then
-          vim.bo.readonly = false
-          vim.bo.modifiable = true
           return true
         end
       end
@@ -131,36 +119,15 @@ function M.check_readonly()
       return true
     end
   end
-
-  -- 检查特定语言的目录
-  local filetype = vim.bo.filetype
-  if filetype and M.config.language_directories[filetype] then
-    for _, dir in ipairs(M.config.language_directories[filetype]) do
-      if is_path_match(file_path, dir) then
-        vim.bo.readonly = true
-        vim.bo.modifiable = false
-        print(
-          "This buffer is read-only because it is in a restricted directory for " ..
-            filetype .. ": " .. dir)
-        return true
-      end
-    end
-  end
-
-  -- 默认允许编辑
-  vim.bo.readonly = false
-  vim.bo.modifiable = true
   return false
 end
 
 ---@class Config
 ---@field restricted_directories table
 ---@field exclude_directories table
----@field language_directories table
 local config = {
   restricted_directories = {},
-  exclude_directories = {},
-  language_directories = {}
+  exclude_directories = {}
 }
 
 ---@type Config
@@ -170,14 +137,16 @@ M.config = config
 function M.setup(opts)
   M.config = vim.tbl_deep_extend("force", M.config, opts or {})
 
-  local group = vim.api.nvim_create_augroup("ReadOnlyBuffers", {
-    clear = true
-  })
+  local group = vim.api.nvim_create_augroup(
+                  "czfadfmin.readonly.ReadOnlyBuffers", {
+      clear = true
+    })
 
-  vim.api.nvim_create_autocmd("BufEnter", {
-    group = group,
-    callback = M.check_readonly
-  })
+  vim.api.nvim_create_autocmd(
+    "BufEnter", {
+      group = group,
+      callback = M.check_readonly
+    })
 end
 
 return M
