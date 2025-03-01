@@ -7,9 +7,10 @@ local default_config = {
     "/etc",
     "/usr",
     "/var",
-    "/tmp" -- 临时文件目录
+    "/tmp", -- 临时文件目录
+    ".*/node_modules/.*",
   },
-  exclude_directories = {}
+  exclude_directories = {},
 }
 
 local function escape_pattern(str)
@@ -56,7 +57,7 @@ local function is_path_match(path, pattern)
     "/" .. pattern .. "/",
     "^" .. pattern .. "/",
     "/" .. pattern .. "$",
-    pattern -- 允许匹配路径中的任意部分
+    pattern, -- 允许匹配路径中的任意部分
   }
 
   -- 检查所有匹配模式
@@ -114,8 +115,9 @@ function M.check_readonly()
       vim.bo.readonly = true
       vim.bo.modifiable = false
       print(
-        "This buffer is read-only because it is in a restricted directory: " ..
-          dir)
+        "This buffer is read-only because it is in a restricted directory: "
+          .. dir
+      )
       return true
     end
   end
@@ -127,7 +129,7 @@ end
 ---@field exclude_directories table
 local config = {
   restricted_directories = {},
-  exclude_directories = {}
+  exclude_directories = {},
 }
 
 ---@type Config
@@ -137,16 +139,38 @@ M.config = config
 function M.setup(opts)
   M.config = vim.tbl_deep_extend("force", M.config, opts or {})
 
-  local group = vim.api.nvim_create_augroup(
-                  "czfadfmin.readonly.ReadOnlyBuffers", {
-      clear = true
+  local group =
+    vim.api.nvim_create_augroup("czfadfmin.readonly.ReadOnlyBuffers", {
+      clear = true,
     })
 
-  vim.api.nvim_create_autocmd(
-    "BufEnter", {
-      group = group,
-      callback = M.check_readonly
-    })
+  vim.api.nvim_create_autocmd("BufEnter", {
+    group = group,
+    callback = M.check_readonly,
+  })
+
+  vim.keymap.set("n", "<leader>suw", function()
+    local current_buf = vim.api.nvim_get_current_buf()
+    local buf_name = vim.api.nvim_buf_get_name(current_buf)
+
+    if buf_name == "" then
+      return
+    end
+
+    if vim.bo.readonly and not vim.bo.modifiable then
+      vim.bo.readonly = false
+      vim.bo.modifiable = true
+      print("The current buffer is writable.")
+    else
+      vim.bo.readonly = true
+      vim.bo.modifiable = false
+      print("The current buffer is read-only.")
+    end
+  end, {
+    buffer = true,
+    silent = true,
+    desc = "Toggle buffer writability! (ReadOnly.nvim)",
+  })
 end
 
 return M
