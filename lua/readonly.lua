@@ -96,8 +96,12 @@ function M.check_readonly()
   local current_buf = vim.api.nvim_get_current_buf()
   local buf_name = vim.api.nvim_buf_get_name(current_buf)
 
+  local is_terminal = vim.api.nvim_get_option_value("buftype", {
+    buf = current_buf,
+  }) == "terminal"
+
   -- 如果是新缓冲区或无名缓冲区，不设置只读
-  if buf_name == "" then
+  if buf_name == "" or is_terminal then
     return false
   end
 
